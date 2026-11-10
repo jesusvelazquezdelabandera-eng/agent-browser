@@ -68,7 +68,7 @@ class TestFlujo:
         assert d.estado is Estado.CONFIRMAR_MOMENTO
         assert "Álex" in t.texto and "inteligencia artificial" in t.texto
         assert "Banpi Domótica" in t.texto and "Sevilla" in t.texto
-        assert "grabarse" in t.texto and "no le llamemos más" in t.texto
+        assert "grabarse" in t.texto and "no quiere más llamadas" in t.texto
         assert "María" in t.texto
 
     def test_camino_feliz_hasta_cita(self) -> None:

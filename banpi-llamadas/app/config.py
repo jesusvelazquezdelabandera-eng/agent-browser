@@ -97,6 +97,8 @@ class Settings:
     piper_voice: str = "es_ES-davefx-medium"
     piper_dir: Path = field(default_factory=lambda: RAIZ_PROYECTO / "modelos" / "piper")
     piper_cuda: bool = False
+    # Duración relativa de la voz: < 1 habla más rápido (0.9 = un 10 % más rápido).
+    piper_length_scale: float = 0.9
     tts_cache_dir: Path = field(default_factory=lambda: RAIZ_PROYECTO / "data" / "cache_tts")
 
     # Detección de voz (VAD)
@@ -144,6 +146,8 @@ class Settings:
     max_duracion_s: int = 300
 
     # Panel web
+    panel_host: str = "127.0.0.1"
+    panel_puerto: int = 8000
     panel_usuario: str = ""
     panel_password: str = ""
 
@@ -174,6 +178,7 @@ def get_settings() -> Settings:
         piper_voice=_str("PIPER_VOICE", "es_ES-davefx-medium"),
         piper_dir=_ruta("PIPER_DIR", "modelos/piper"),
         piper_cuda=_bool("PIPER_CUDA", False),
+        piper_length_scale=_float("PIPER_LENGTH_SCALE", 0.9),
         tts_cache_dir=_ruta("TTS_CACHE_DIR", "data/cache_tts"),
         vad_backend=_str("VAD_BACKEND", "webrtc"),
         vad_agresividad=_int("VAD_AGRESIVIDAD", 2),
@@ -207,6 +212,8 @@ def get_settings() -> Settings:
         worker_intervalo_s=_float("WORKER_INTERVALO_S", 10.0),
         max_turnos=_int("MAX_TURNOS", 20),
         max_duracion_s=_int("MAX_DURACION_S", 300),
+        panel_host=_str("PANEL_HOST", "127.0.0.1"),
+        panel_puerto=_int("PANEL_PUERTO", 8000),
         panel_usuario=_str("PANEL_USUARIO", ""),
         panel_password=_str("PANEL_PASSWORD", ""),
     )

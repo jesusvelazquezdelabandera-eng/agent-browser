@@ -349,10 +349,10 @@ def aviso_inicial(nombre_agente: str, empresa: str, ciudad: str, nombre_cliente:
     """
     saludo = f"Hola, {nombre_cliente.split()[0]}. " if nombre_cliente.strip() else "Hola. "
     return (
-        f"{saludo}Soy {nombre_agente}, un asistente virtual con inteligencia artificial "
-        f"de {empresa}, en {ciudad}, y le llamo para contarle nuestros servicios de domótica. "
-        "La llamada puede grabarse; si no quiere, o prefiere que no le llamemos más, "
-        "dígamelo cuando quiera. ¿Tiene un minuto?"
+        f"{saludo}Soy {nombre_agente}, un asistente de inteligencia artificial de {empresa}, "
+        f"de {ciudad}, y le llamo para ofrecerle servicios de domótica. "
+        "La llamada puede grabarse; si no quiere, o no quiere más llamadas, dígamelo. "
+        "¿Tiene un minuto?"
     )
 
 

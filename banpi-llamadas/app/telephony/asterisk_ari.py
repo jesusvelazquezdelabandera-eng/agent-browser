@@ -231,11 +231,19 @@ class LlamadaAsterisk(Llamada):
                 self.colgada.set()
 
     async def frames(self) -> AsyncIterator[bytes]:
+        """Audio del cliente. Rellena con silencio cuando no llegan paquetes.
+
+        Asterisk (y algunos proveedores con supresión de silencio) no envía RTP
+        mientras el otro extremo calla. Sin esas tramas el VAD no podría medir el
+        silencio que marca el fin del turno, así que se generan aquí.
+        """
+        silencio_trama = b"\x00\x00" * 160
         while not self.colgada.is_set():
             try:
-                yield await asyncio.wait_for(self.rtp.entrada.get(), timeout=0.5)
+                yield await asyncio.wait_for(self.rtp.entrada.get(), timeout=0.06)
             except asyncio.TimeoutError:
-                continue
+                for _ in range(3):  # 60 ms de silencio
+                    yield silencio_trama
 
     async def enviar_audio(self, pcm: bytes) -> None:
         self.rtp.salida.escribir(pcm)

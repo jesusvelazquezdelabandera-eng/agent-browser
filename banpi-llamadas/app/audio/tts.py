@@ -73,12 +73,15 @@ class PiperTTS:
     # --- síntesis ----------------------------------------------------------
 
     def _clave(self, texto: str) -> str:
-        return hashlib.sha1(f"{self.s.piper_voice}|{self.sample_rate}|{texto}".encode()).hexdigest()
+        return hashlib.sha1(f"{self.s.piper_voice}|{self.sample_rate}|{self.s.piper_length_scale}|{texto}".encode()).hexdigest()
 
     def _sintetizar_sync(self, texto: str) -> bytes:
+        from piper import SynthesisConfig
+
         with self._lock:
             voz = self._cargar()
-            trozos = list(voz.synthesize(texto))
+            config = SynthesisConfig(length_scale=self.s.piper_length_scale)
+            trozos = list(voz.synthesize(texto, syn_config=config))
         if not trozos:
             return b""
         origen = trozos[0].sample_rate

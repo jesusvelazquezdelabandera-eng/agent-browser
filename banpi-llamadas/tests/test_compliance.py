@@ -216,4 +216,4 @@ class TestGrabacionYAviso:
         assert "inteligencia artificial" in t
         assert "Banpi Domótica" in t and "Sevilla" in t
         assert "grabarse" in t
-        assert "no le llamemos más" in t
+        assert "no quiere más llamadas" in t

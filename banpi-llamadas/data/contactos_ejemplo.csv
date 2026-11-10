@@ -1,0 +1,3 @@
+nombre;telefono;email;consentimiento;consentimiento_fecha;consentimiento_origen;base_legal
+Cliente de prueba;600000000;prueba@example.com;sí;2026-11-01;formulario web banpi.es;consentimiento
+Contacto sin consentimiento;600000001;;no;;feria de domótica;interes_legitimo

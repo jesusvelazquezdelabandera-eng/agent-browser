@@ -75,7 +75,12 @@ def sesion() -> Iterator[Session]:
 
 
 def como_utc(dt: Optional[datetime]) -> Optional[datetime]:
-    """SQLite devuelve fechas sin zona horaria: las marcamos como UTC."""
+    """Devuelve la fecha en UTC con zona horaria.
+
+    SQLite no guarda la zona horaria: todo se guarda en UTC y, al leer, las fechas
+    sin zona se interpretan como UTC. Las fechas con zona (por ejemplo, hora de
+    Madrid) se convierten a UTC antes de guardarlas.
+    """
     if dt is None:
         return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)

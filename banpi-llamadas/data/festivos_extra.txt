@@ -1,0 +1,5 @@
+# Festivos autonómicos (Andalucía) y locales (Sevilla), uno por línea en formato AAAA-MM-DD.
+# Los festivos nacionales ya se calculan solos (incluido Viernes Santo).
+# Copia las fechas del calendario laboral oficial (BOJA y Ayuntamiento de Sevilla) de cada año.
+# Ejemplo:
+# 2027-03-25  # Jueves Santo
