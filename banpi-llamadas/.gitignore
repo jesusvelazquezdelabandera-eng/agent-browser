@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+data/*.db
+data/*.db-*
+data/cache_tts/
+data/grabaciones/
+modelos/
