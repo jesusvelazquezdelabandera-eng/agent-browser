@@ -113,6 +113,9 @@ class Settings:
     ari_password: str = "cambia-esta-clave"
     ari_app: str = "banpi"
     sip_endpoint: str = "PJSIP/{numero}@troncal"
+    # Cómo espera el proveedor el número: "nacional" (600112233), "e164" (+34600112233),
+    # "internacional" (0034600112233) o "sin_mas" (34600112233).
+    sip_formato_numero: str = "nacional"
     caller_id: str = ""
     rtp_host_local: str = "127.0.0.1"
     rtp_puerto_inicio: int = 40000
@@ -183,6 +186,7 @@ def get_settings() -> Settings:
         ari_password=_str("ARI_PASSWORD", "cambia-esta-clave"),
         ari_app=_str("ARI_APP", "banpi"),
         sip_endpoint=_str("SIP_ENDPOINT", "PJSIP/{numero}@troncal"),
+        sip_formato_numero=_str("SIP_FORMATO_NUMERO", "nacional"),
         caller_id=_str("CALLER_ID", ""),
         rtp_host_local=_str("RTP_HOST_LOCAL", "127.0.0.1"),
         rtp_puerto_inicio=_int("RTP_PUERTO_INICIO", 40000),

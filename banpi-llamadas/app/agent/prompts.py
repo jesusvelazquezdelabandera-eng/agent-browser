@@ -52,11 +52,11 @@ class Instruccion:
 
 # Frases de presentación de cada servicio para la propuesta de respaldo.
 FRASES_INTERES = {
-    "persianas": "las persianas suben y bajan solas según la hora o el sol",
-    "luces": "las luces se encienden y se apagan solas o desde el móvil",
-    "climatizacion": "la climatización se ajusta sola y no se queda encendida sin nadie en casa",
-    "alarma": "la alarma le avisa al móvil al momento",
-    "camaras": "ve las cámaras desde el móvil esté donde esté",
+    "persianas": "las persianas suben y bajan solas",
+    "luces": "las luces se apagan solas cuando no hay nadie",
+    "climatizacion": "el clima se ajusta solo",
+    "alarma": "la alarma le avisa al momento",
+    "camaras": "ve las cámaras esté donde esté",
 }
 
 
@@ -88,7 +88,7 @@ def instruccion_propuesta(datos_resumen: str, intereses: list[str], empresa: str
     if frases:
         beneficio = " y ".join(frases)
         respaldo = (
-            f"Eso lo hacemos mucho: con la domótica {beneficio}, todo desde el móvil. "
+            f"Eso lo hacemos mucho: {beneficio}, y lo controla todo desde el móvil. "
             "¿Le vendría bien una visita gratuita y sin compromiso, o prefiere que le llame un comercial?"
         )
     else:

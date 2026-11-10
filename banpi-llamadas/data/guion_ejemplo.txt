@@ -1,0 +1,8 @@
+# Guion de ejemplo para: python -m app.simulate --modo guion
+# Cada línea es una intervención del cliente, que se dice cuando Álex termina de hablar.
+# Una línea que empieza por ! interrumpe a Álex mientras habla.
+Sí, dígame.
+Tengo un piso en Triana.
+Me interesan las persianas y la alarma, que me preocupa la seguridad.
+Vale, una visita.
+El jueves a las cinco de la tarde.
