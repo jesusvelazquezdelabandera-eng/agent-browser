@@ -340,6 +340,7 @@ class EjecutorLlamadas:
             s.flush()
             llamada_id, contacto_id = llamada.id, contacto.id
             telefono, nombre = contacto.telefono, contacto.nombre
+            origen = contacto.consentimiento_origen
             registrar_auditoria(s, "marcacion", contacto_id=contacto_id, llamada_id=llamada_id, telefono=telefono)
 
         marcacion = await self.telefonia.originar(telefono, self.s.caller_id, self.s.timeout_respuesta_s)
@@ -362,7 +363,7 @@ class EjecutorLlamadas:
             fila.grabacion_permitida = bool(ruta_grabacion)
             fila.grabacion_ruta = ruta_grabacion
 
-        dialogo = Dialogo(nombre, settings=self.s)
+        dialogo = Dialogo(nombre, settings=self.s, origen_datos=origen)
         sesion = SesionLlamada(tel, dialogo, self.llm, self.stt, self.tts, self.s,
                                OyenteBD(self.fabrica, llamada_id, contacto_id))  # fmt: skip
         resultado = await sesion.ejecutar()

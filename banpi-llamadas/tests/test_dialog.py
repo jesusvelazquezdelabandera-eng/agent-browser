@@ -34,6 +34,10 @@ class TestIntenciones:
             ("No me llaméis más, por favor", Intencion.NO_LLAMAR),
             ("no me vuelvan a llamar", Intencion.NO_LLAMAR),
             ("bórrenme de su lista", Intencion.NO_LLAMAR),
+            ("Sí, bórreme", Intencion.NO_LLAMAR),
+            ("quítame, por favor", Intencion.NO_LLAMAR),
+            ("¿De dónde habéis sacado mi número?", Intencion.ORIGEN_DATOS),
+            ("¿Por qué tienen mi teléfono?", Intencion.ORIGEN_DATOS),
             ("quiero darme de baja", Intencion.NO_LLAMAR),
             ("estoy en la lista Robinson", Intencion.NO_LLAMAR),
             ("No gracias, no me interesa y no me llaméis más", Intencion.NO_LLAMAR),
@@ -217,6 +221,40 @@ class TestFlujo:
         d = nuevo()
         d.procesar("no me interesa")
         assert d.procesar("hola").terminar
+
+
+class TestCasosReales:
+    """Fallos encontrados al probar conversaciones completas."""
+
+    def test_robot_no_es_robo(self) -> None:
+        d = nuevo()
+        d.procesar("¿Eres un robot?")
+        assert d.datos.intereses == [] and d.datos.preocupaciones == []
+        d.procesar("vale, sigue")
+        t = d.procesar("Tengo un local, una tienda")
+        assert d.estado is Estado.DESCUBRIMIENTO and "persianas" in t.respaldo
+
+    def test_origen_de_los_datos(self) -> None:
+        d = Dialogo("María", reloj=lambda: AHORA, origen_datos="el formulario de banpi.es")
+        d.inicio()
+        t = d.procesar("¿Y de dónde habéis sacado mi número?")
+        assert "formulario de banpi.es" in t.texto and "borro" in t.texto and not t.terminar
+        t = d.procesar("Sí, bórreme")
+        assert t.terminar and Accion.MARCAR_NO_LLAMAR in t.acciones
+
+    def test_origen_sin_dato(self) -> None:
+        d = nuevo()
+        t = d.procesar("¿Quién os ha dado mi número?")
+        assert "base de datos" in t.texto
+
+    def test_no_repite_pregunta_si_no_sabe(self) -> None:
+        d = nuevo()
+        d.procesar("sí")
+        t1 = d.procesar("una casa")
+        t2 = d.procesar("No sé, la verdad")
+        assert t1.respaldo != t2.respaldo and "importa" in t2.respaldo
+        t3 = d.procesar("pues tampoco sé")
+        assert d.estado is Estado.CIERRE and "visita" in t3.respaldo
 
 
 class TestLimpiezaLLM:

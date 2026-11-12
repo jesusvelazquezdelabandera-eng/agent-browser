@@ -48,6 +48,7 @@ class Intencion(str, Enum):
     OPONE_GRABACION = "opone_grabacion"
     PREGUNTA_IA = "pregunta_ia"
     PREGUNTA_PRECIO = "pregunta_precio"
+    ORIGEN_DATOS = "origen_datos"
     PIDE_HUMANO = "pide_humano"
     AFIRMATIVO = "afirmativo"
     NEGATIVO = "negativo"
@@ -137,6 +138,7 @@ _PATRONES: list[tuple[Intencion, list[str]]] = [
             r"no (quiero|queremos) que (me|nos) (llame|vuelva)",
             r"(borre[n]?|borra|borrad|eliminen?|quite[n]?|quitad|saque[n]?) (me|mi|nos|el)? ?(de (la|su|vuestra) lista|mis datos|mi numero|el numero|de la base)",
             r"\b(borr|quit|sac|elimin)\w*(me|nos) de (la|su|sus|vuestra|vuestras|esa|esta) (lista|base)",
+            r"\b(borr|quit|elimin)(e|a|ad|en|ame|eme)(me|nos)\b",  # "bórreme", "quítenme"
             r"(dar(me)?|darnos) de baja",
             r"\blista robinson\b",
             r"deje[n]? de llamar",
@@ -179,6 +181,15 @@ _PATRONES: list[tuple[Intencion, list[str]]] = [
             r"ya (tengo|tenemos) (domotica|todo|alarma|empresa)",
             r"no (estoy|estamos) (buscando|pensando)",
             r"^no me interesa",
+        ],
+    ),
+    (
+        Intencion.ORIGEN_DATOS,
+        [
+            r"de donde (ha[ns]?|habeis|has|han) (sacado|conseguido|obtenido|cogido)",
+            r"(como|por que|porque) (tiene[ns]?|teneis|tienes) (mi|este) (numero|telefono|dato)",
+            r"quien (le|les|os|te) (ha|han) dado (mi|este) (numero|telefono)",
+            r"de donde (sale|salen|viene) (mi|este|el) (numero|telefono)",
         ],
     ),
     (
@@ -251,12 +262,12 @@ _INTERESES = {
     "persianas": r"\b(persiana|toldo|estor|cortina)",
     "luces": r"\b(luz|luces|iluminacion|bombilla|lampara|enchufe)",
     "climatizacion": r"\b(clima|climatizacion|aire acondicionado|aire|calefaccion|termostato|temperatura|caldera|suelo radiante)",
-    "alarma": r"\b(alarma|seguridad|robo|ladron|intrus|okupa)",
+    "alarma": r"\b(alarma|seguridad|robos?\b|ladron|intrus|okupa)",
     "camaras": r"\b(camara|videovigilancia|vigilancia|videoportero|portero)",
 }
 _PREOCUPACIONES = {
     "ahorro": r"\b(ahorr|factura|consumo|gasto|luz cara|energia|eficien)",
-    "seguridad": r"\b(segur|robo|ladron|okupa|tranquil|vigil)",
+    "seguridad": r"\b(segur|robos?\b|ladron|okupa|tranquil|vigil)",
     "comodidad": r"\b(comod|facil|automatic|olvid|desde el movil|a distancia|vacaciones)",
     "mayores": r"\b(mayor|anciano|abuel|movilidad|dependien|accesib)",
 }
@@ -305,11 +316,15 @@ class Dialogo:
         self,
         nombre_cliente: str = "",
         settings: Optional[Settings] = None,
+        origen_datos: str = "",
         reloj: Optional[callable] = None,  # type: ignore[valid-type]
     ) -> None:
         self.s = settings or get_settings()
         self.zona = ZoneInfo(self.s.zona_horaria)
         self.nombre_cliente = nombre_cliente
+        # Dónde dio el cliente su consentimiento (para responder "¿de dónde tenéis mi número?").
+        self.origen_datos = origen_datos.strip()
+        self._ultimo_paso = ""
         self._reloj = reloj or (lambda: datetime.now(self.zona))
         self.estado = Estado.SALUDO
         self.datos = DatosLlamada(grabacion_permitida=self.s.grabar_llamadas)
@@ -426,6 +441,15 @@ class Dialogo:
                 f"Sí, soy un asistente virtual con inteligencia artificial de {self.s.nombre_empresa}; "
                 "si lo prefiere, le puede llamar una persona del equipo."
             )
+        if intencion is Intencion.ORIGEN_DATOS:
+            # Derecho de información (RGPD, art. 14): de dónde salen los datos.
+            if self.origen_datos:
+                origen = f"Nos dio su consentimiento para que le llamáramos a través de {self.origen_datos}"
+            else:
+                origen = f"Su número está en nuestra base de datos de clientes interesados de {self.s.nombre_empresa}"
+            return self._continuar(
+                f"{origen}. Si lo prefiere, le borro ahora mismo y no le volvemos a llamar."
+            )
         if intencion is Intencion.PIDE_HUMANO:
             self.datos.cita_tipo = "llamada"
             self._ir(Estado.CIERRE)
@@ -528,7 +552,9 @@ class Dialogo:
         return "preocupacion"
 
     def _turno_descubrimiento(self) -> Turno:
-        ins = prompts.instruccion_descubrimiento(self._paso_descubrimiento(), self.datos.resumen())
+        paso = self._paso_descubrimiento()
+        self._ultimo_paso = paso
+        ins = prompts.instruccion_descubrimiento(paso, self.datos.resumen())
         return Turno(Estado.DESCUBRIMIENTO, instruccion=ins.objetivo, respaldo=ins.respaldo)
 
     def _descubrimiento(self, intencion: Intencion, texto: str) -> Turno:
@@ -537,6 +563,14 @@ class Dialogo:
             self.datos.intereses and self._turnos_estado >= 2
         ):
             return self._turno_propuesta()
+        if self._paso_descubrimiento() == self._ultimo_paso and intencion is not Intencion.PREGUNTA_IA:
+            # El cliente no ha sabido contestar ("no sé"): no se repite la pregunta.
+            if self._ultimo_paso == "intereses":
+                self._ultimo_paso = "preocupacion"
+                ins = prompts.instruccion_descubrimiento("preocupacion", self.datos.resumen())
+                return Turno(Estado.DESCUBRIMIENTO, instruccion=ins.objetivo, respaldo=ins.respaldo)
+            if self._ultimo_paso == "preocupacion":
+                return self._turno_propuesta()
         return self._turno_descubrimiento()
 
     def _turno_propuesta(self) -> Turno:
