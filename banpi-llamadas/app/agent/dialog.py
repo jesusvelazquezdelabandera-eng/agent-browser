@@ -49,6 +49,7 @@ class Intencion(str, Enum):
     PREGUNTA_IA = "pregunta_ia"
     PREGUNTA_PRECIO = "pregunta_precio"
     ORIGEN_DATOS = "origen_datos"
+    PREGUNTA_TECNICA = "pregunta_tecnica"
     PIDE_HUMANO = "pide_humano"
     AFIRMATIVO = "afirmativo"
     NEGATIVO = "negativo"
@@ -76,14 +77,17 @@ class Resultado(str, Enum):
 class Turno:
     """Respuesta del agente para un turno.
 
-    Se dice primero `texto` (fijo) y después, si hay `instruccion`, lo que genere
-    el LLM. `respaldo` es lo que se dice si el LLM falla.
+    Se dice primero `texto` (fijo), después, si hay `instruccion`, lo que genere
+    el LLM (como mucho `max_frases`), y al final `texto_final` (fijo). `respaldo`
+    es lo que se dice en lugar del LLM si este falla.
     """
 
     estado: Estado
     texto: str = ""
     instruccion: Optional[str] = None
     respaldo: str = ""
+    max_frases: int = 2
+    texto_final: str = ""
     terminar: bool = False
     acciones: list[Accion] = field(default_factory=list)
     intencion: Intencion = Intencion.OTRA
@@ -190,6 +194,18 @@ _PATRONES: list[tuple[Intencion, list[str]]] = [
             r"(como|por que|porque) (tiene[ns]?|teneis|tienes) (mi|este) (numero|telefono|dato)",
             r"quien (le|les|os|te) (ha|han) dado (mi|este) (numero|telefono)",
             r"de donde (sale|salen|viene) (mi|este|el) (numero|telefono)",
+        ],
+    ),
+    (
+        Intencion.PREGUNTA_TECNICA,
+        [
+            r"\bcompatible",
+            r"\b(alexa|google home|siri|homekit|home assistant|apple home|smartthings)\b",
+            r"\b(que|cual|cuales) marcas?\b",
+            r"\bgarantia",
+            r"\b(cuanto|cuantos dias|cuanto tiempo) (tarda|tardan|dura|se tarda)",
+            r"\b(funciona|vale|sirve) (con|para) (mi|el|la|los|las)\b",
+            r"\b(necesita|hace falta) (obra|wifi|internet|cableado)",
         ],
     ),
     (
@@ -461,6 +477,14 @@ class Dialogo:
                 texto="Claro, le pido a un compañero del equipo comercial que le llame. "
                 "¿Qué día y a qué hora le viene bien?",
             )
+        if intencion is Intencion.PREGUNTA_TECNICA:
+            # Compatibilidades, marcas, plazos o garantías: nunca los decide la IA.
+            self._ir(Estado.CIERRE)
+            return Turno(
+                Estado.CIERRE,
+                texto="Eso depende de lo que ya tenga instalado, así que se lo confirma el comercial en la visita, "
+                "sin compromiso. ¿Le parece que se la agendemos?",
+            )
         if intencion is Intencion.PREGUNTA_PRECIO:
             self._ir(Estado.CIERRE)
             return Turno(
@@ -605,8 +629,14 @@ class Dialogo:
 
         if self._turnos_estado > self.MAX_TURNOS_CIERRE:
             return self._fin(Resultado.SIN_CITA, "No le entretengo más. " + self._despedida())
-        ins = prompts.instruccion_respuesta_libre(self.datos.resumen())
-        return Turno(Estado.CIERRE, instruccion=ins.objetivo, respaldo=ins.respaldo)
+        ins = prompts.instruccion_respuesta_libre(self.datos.resumen(), texto, self.s.zona_servicio)
+        return Turno(
+            Estado.CIERRE,
+            instruccion=ins.objetivo,
+            respaldo=ins.respaldo,
+            max_frases=1,
+            texto_final="¿Le parece que le agendemos una visita gratuita, o prefiere que le llame un comercial?",
+        )
 
     def _confirmar_cita(self, fecha: FechaHablada, texto: str) -> Turno:
         anterior = self.datos.cita

@@ -65,9 +65,10 @@ async def modo_texto(s: Settings, nombre: str) -> None:
             dicho.append(frase)
         if turno.instruccion:
             mensajes = conversacion.mensajes(turno.instruccion, texto_previo=turno.texto)
-            async for frase in respuesta_en_frases(llm, mensajes, turno.respaldo):
+            async for frase in respuesta_en_frases(llm, mensajes, turno.respaldo, max_frases=turno.max_frases, sin_preguntas=bool(turno.texto_final)):
                 primera = primera or time.monotonic()
                 dicho.append(frase)
+        dicho.extend(prompts.dividir_frases(turno.texto_final))
         texto = " ".join(dicho)
         conversacion.agente(texto)
         latencia = f"  (LLM: {int((primera - t0) * 1000)} ms hasta la 1.ª frase)" if primera else ""

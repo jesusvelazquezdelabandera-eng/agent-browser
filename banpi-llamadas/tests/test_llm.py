@@ -104,3 +104,29 @@ def test_ollama_streaming_con_servidor_falso() -> None:
     frases = asyncio.run(_lista(respuesta_en_frases(llm, [{"role": "user", "content": "hola"}], "R.")))
     assert frases == ["Claro, le cuento."]
     assert recibido["model"] == "qwen2.5:7b" and recibido["stream"] is True
+
+
+def test_primera_frase_se_adelanta_por_la_coma() -> None:
+    gen = frases_en_streaming(_trozos("Claro que trabajamos en Dos Hermanas", ", es parte de nuestra zona. ", "¿Le agendo una visita?"))
+    assert asyncio.run(_lista(gen)) == [
+        "Claro que trabajamos en Dos Hermanas,",
+        "es parte de nuestra zona.",
+        "¿Le agendo una visita?",
+    ]
+
+
+def test_coma_temprana_no_corta() -> None:
+    gen = frases_en_streaming(_trozos("Sí, claro. ", "Perfecto."))
+    assert asyncio.run(_lista(gen)) == ["Sí, claro.", "Perfecto."]
+
+
+def test_sin_preguntas_usa_respaldo_si_todo_son_preguntas() -> None:
+    class LLMPregunton:
+        async def generar(self, mensajes, respaldo=""):  # type: ignore[no-untyped-def]
+            yield "¿Le preocupa la seguridad? "
+
+        async def calentar(self) -> None:
+            return None
+
+    gen = respuesta_en_frases(LLMPregunton(), [], "Respaldo.", max_frases=1, sin_preguntas=True)
+    assert asyncio.run(_lista(gen)) == ["Respaldo."]

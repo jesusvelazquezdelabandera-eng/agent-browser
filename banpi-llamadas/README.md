@@ -34,7 +34,7 @@ Cliente ⇄ proveedor SIP ⇄ Asterisk ──ARI (órdenes y eventos)──▶ a
 5. **Cierre**: visita gratuita sin compromiso o llamada con un comercial, con día y hora.
 6. **Despedida.**
 
-Las decisiones importantes las toman reglas deterministas, no el LLM: "no me llaméis más" (marca el contacto como no contactar al instante), "no me interesa" (se despide con educación), "ahora no puedo", la oposición a la grabación, "¿eres un robot?" (siempre reconoce que es una IA), las preguntas de precio (nunca da cifras) y "quiero hablar con una persona". El LLM solo redacta las respuestas, con un máximo de dos frases; si inventa un precio, la frase se sustituye. Si Ollama falla o tarda más de 4 segundos, Álex usa una frase de respaldo y la llamada sigue.
+Las decisiones importantes las toman reglas deterministas, no el LLM: "no me llaméis más" (marca el contacto como no contactar al instante), "no me interesa" (se despide con educación), "ahora no puedo", la oposición a la grabación, "¿eres un robot?" (siempre reconoce que es una IA), "¿de dónde habéis sacado mi número?" (responde con el origen del consentimiento guardado y ofrece borrarlo), las preguntas de precio (nunca da cifras), las preguntas técnicas como compatibilidades, marcas o plazos (siempre las deriva al comercial) y "quiero hablar con una persona". El LLM solo redacta las respuestas, con un máximo de dos frases; en el cierre redacta una sola frase y la propuesta de visita la añade siempre el sistema. Si el LLM escribe un precio o afirma que algo "es compatible", la frase se sustituye. Si Ollama falla o no da su primera frase en `LLM_TIMEOUT_PRIMERA_S` segundos (2,5 por defecto), Álex usa una frase de respaldo y la llamada sigue.
 
 El cliente puede interrumpir a Álex: en cuanto el VAD detecta 250 ms de voz, se corta el audio pendiente y se cancela la generación.
 
@@ -50,7 +50,15 @@ Medidas en una máquina de 4 núcleos **sin GPU**, con el modo guion (Whisper + 
 <tr><td><code>base</code></td><td>567 ms</td><td>1288 ms</td></tr>
 </table>
 
-Ollama suma el tiempo hasta su primera frase: con GPU suele ser de unos cientos de milisegundos, y en CPU un modelo de 7B puede tardar varios segundos. Sin GPU, usa `WHISPER_MODEL=base` y un modelo más pequeño (`OLLAMA_MODEL=qwen2.5:3b`). Con GPU NVIDIA, `small` o `medium` y `qwen2.5:7b` entran en el objetivo.
+El LLM suma el tiempo hasta su primera frase. En la misma máquina sin GPU, Qwen2.5 3B (cuantizado a 4 bits) tardó entre 1 y 8 s en su primera frase, y en una llamada completa con Whisper y Piper compitiendo por la CPU la latencia media subió a unos 4 s, con varios turnos resueltos con la frase de respaldo. Con GPU, la primera frase de un modelo de 7B suele tardar unos cientos de milisegundos.
+
+Recomendación según el equipo:
+
+<table>
+<tr><th>Equipo</th><th>Configuración</th></tr>
+<tr><td>Con GPU NVIDIA (8 GB de VRAM o más)</td><td><code>WHISPER_MODEL=small</code> y <code>OLLAMA_MODEL=qwen2.5:7b</code>.</td></tr>
+<tr><td>Solo CPU</td><td><code>WHISPER_MODEL=base</code> y <code>LLM_BACKEND=plantillas</code>: Álex usa sus frases preparadas para cada estado, sin LLM, con una latencia de 1,3 s en las pruebas. Con un LLM en CPU, la conversación funciona pero con pausas de varios segundos.</td></tr>
+</table>
 
 ## Requisitos
 

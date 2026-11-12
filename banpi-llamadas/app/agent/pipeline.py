@@ -95,7 +95,7 @@ class SesionLlamada:
         settings: Optional[Settings] = None,
         oyente: Optional[Oyente] = None,
         silencio_max_s: float = 8.0,
-        timeout_llm_s: float = 4.0,
+        timeout_llm_s: Optional[float] = None,
     ) -> None:
         self.s = settings or get_settings()
         self.llamada = llamada
@@ -105,7 +105,7 @@ class SesionLlamada:
         self.tts = tts
         self.oyente: Oyente = oyente or OyenteNulo()
         self.silencio_max_s = silencio_max_s
-        self.timeout_llm_s = timeout_llm_s
+        self.timeout_llm_s = timeout_llm_s if timeout_llm_s is not None else self.s.llm_timeout_primera_s
         self.metricas = Metricas()
         self.conversacion = Conversacion(prompts.prompt_sistema(self.s))
         self.vad = DetectorVoz(
@@ -252,9 +252,12 @@ class SesionLlamada:
             if turno.instruccion:
                 mensajes = self.conversacion.mensajes(turno.instruccion, texto_previo=turno.texto)
                 async for frase in respuesta_en_frases(
-                    self.llm, mensajes, turno.respaldo, timeout_primera_s=self.timeout_llm_s
+                    self.llm, mensajes, turno.respaldo, timeout_primera_s=self.timeout_llm_s,
+                    max_frases=turno.max_frases, sin_preguntas=bool(turno.texto_final),
                 ):
                     await emitir(frase)
+            for frase in prompts.dividir_frases(turno.texto_final):
+                await emitir(frase)
         finally:
             texto = " ".join(dicho)
             if texto:

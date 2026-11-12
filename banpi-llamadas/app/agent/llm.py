@@ -162,30 +162,51 @@ class Conversacion:
 _FIN = re.compile(r"[.!?…]+[\"')»]*\s")
 
 
-async def frases_en_streaming(trozos: AsyncIterator[str], max_frases: int = 2) -> AsyncIterator[str]:
+async def frases_en_streaming(
+    trozos: AsyncIterator[str], max_frases: int = 2, corte_coma: int = 25
+) -> AsyncIterator[str]:
     """Agrupa los trozos del LLM en frases completas y las va devolviendo.
 
-    Se detiene al llegar a `max_frases` (regla de máximo dos frases).
+    Para bajar la latencia, la primera frase se adelanta por su primera coma cuando
+    ya lleva `corte_coma` caracteres: así la voz empieza antes de que el modelo
+    termine la frase. Se detiene al llegar a `max_frases` (regla de máximo dos frases).
     """
     buffer = ""
     emitidas = 0
+    primer_trozo = True
     async for trozo in trozos:
         buffer += trozo
         while True:
             m = _FIN.search(buffer)
+            coma = buffer.find(", ", corte_coma) if primer_trozo and corte_coma else -1
+            if coma != -1 and (m is None or coma < m.start()):
+                clausula, buffer = buffer[: coma + 1], buffer[coma + 2 :]
+                clausula = prompts.limpiar_frase(clausula)
+                if clausula:
+                    yield clausula  # no cuenta como frase completa
+                    primer_trozo = False
+                continue
             # Evita cortar en abreviaturas muy cortas como "Sr." o números "1.".
-            if not m or len(buffer[: m.end()].strip()) < 4:
-                break
-            frase, buffer = buffer[: m.end()], buffer[m.end() :]
-            frase = prompts.limpiar_frase(frase)
-            if frase:
-                yield frase
-                emitidas += 1
-                if emitidas >= max_frases:
-                    return
+            if m and len(buffer[: m.end()].strip()) >= 4:
+                frase, buffer = buffer[: m.end()], buffer[m.end() :]
+                frase = prompts.limpiar_frase(frase)
+                if frase:
+                    yield frase
+                    primer_trozo = False
+                    emitidas += 1
+                    if emitidas >= max_frases:
+                        return
+                continue
+            break
     resto = prompts.limpiar_frase(buffer)
     if resto and emitidas < max_frases:
         yield resto
+
+
+async def _sin_preguntas(frases: AsyncIterator[str]) -> AsyncIterator[str]:
+    async for frase in frases:
+        if not frase.rstrip().endswith("?"):
+            yield frase
 
 
 async def respuesta_en_frases(
@@ -194,13 +215,17 @@ async def respuesta_en_frases(
     respaldo: str,
     timeout_primera_s: float = 4.0,
     max_frases: int = 2,
+    sin_preguntas: bool = False,
 ) -> AsyncIterator[str]:
     """Genera la respuesta frase a frase; si el LLM falla o tarda, usa el respaldo.
 
     Si el fallo ocurre después de haber dicho alguna frase, simplemente se termina
-    (no se mezcla el respaldo con una respuesta a medias).
+    (no se mezcla el respaldo con una respuesta a medias). Con `sin_preguntas`, se
+    descartan las frases que son preguntas (cuando la pregunta la pone el sistema).
     """
     generador = frases_en_streaming(llm.generar(mensajes, respaldo), max_frases)
+    if sin_preguntas:
+        generador = _sin_preguntas(generador)
     emitidas = 0
     try:
         primera = await asyncio.wait_for(generador.__anext__(), timeout=timeout_primera_s)
@@ -212,7 +237,7 @@ async def respuesta_en_frases(
     except StopAsyncIteration:
         pass
     except (asyncio.TimeoutError, httpx.HTTPError, RuntimeError, json.JSONDecodeError) as e:
-        log.warning("LLM sin respuesta válida (%s); se usa la frase de respaldo", e)
+        log.warning("LLM sin respuesta válida (%r); se usa la frase de respaldo", e)
     finally:
         await generador.aclose()
     if emitidas == 0 and respaldo:

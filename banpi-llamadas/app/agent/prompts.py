@@ -33,10 +33,13 @@ Cómo hablas:
 - Nada de listas, viñetas, emojis, asteriscos ni formato: todo lo que escribes se convierte en voz.
 - Escribe los números y las horas como se dicen ("a las cinco de la tarde").
 - No repitas el saludo ni te vuelvas a presentar.
+- No repitas lo que el cliente ya te ha contado ni le vuelvas a preguntar algo que ya ha contestado.
 
 Reglas que nunca rompes:
 - Si te preguntan, reconoces siempre que eres una inteligencia artificial.
 - No inventas precios, plazos, descuentos, marcas ni promesas. Si no sabes algo, dices que lo consultará un comercial.
+- Nunca digas que algo es compatible con un aparato o una marca (Alexa, Google, una caldera concreta...): eso lo confirma el comercial en la visita.
+- Si preguntan por un municipio, contesta según la zona de trabajo indicada arriba; si no está claro, di que lo confirma el comercial.
 - Si el cliente no está interesado, lo aceptas con educación, sin insistir.
 - No pides datos bancarios ni datos sensibles.
 - Sigue siempre la INSTRUCCIÓN DEL MOMENTO que recibirás: es lo que debes conseguir en esta respuesta."""
@@ -70,14 +73,14 @@ def instruccion_descubrimiento(paso: str, datos_resumen: str) -> Instruccion:
         )
     if paso == "intereses":
         return Instruccion(
-            f"Lo que sabes del cliente: {datos_resumen}. Pregúntale si ha pensado en automatizar "
-            "algo de su casa o local: persianas, luces, climatización, alarma o cámaras.",
+            f"(Contexto, no lo repitas: {datos_resumen}.) Pregúntale si ha pensado en automatizar algo, "
+            "nombrando los ejemplos: persianas, luces, climatización, alarma o cámaras.",
             "¿Y ha pensado alguna vez en automatizar algo, como las persianas, las luces, "
             "la climatización o la alarma?",
         )
     return Instruccion(
-        f"Lo que sabes del cliente: {datos_resumen}. Pregúntale qué es lo que más le importa o le "
-        "preocupa: ahorrar en la factura, la seguridad o la comodidad.",
+        f"(Contexto, no lo repitas: {datos_resumen}.) Pregúntale qué es lo que más le importa: "
+        "ahorrar en la factura, la seguridad o la comodidad.",
         "¿Y qué es lo que más le importa: ahorrar en la factura, la seguridad o la comodidad?",
     )
 
@@ -104,14 +107,15 @@ def instruccion_propuesta(datos_resumen: str, intereses: list[str], empresa: str
     )
 
 
-def instruccion_respuesta_libre(datos_resumen: str) -> Instruccion:
+def instruccion_respuesta_libre(datos_resumen: str, texto_cliente: str = "", zona: str = "") -> Instruccion:
     """El cliente pregunta o comenta algo durante el cierre."""
+    zona_txt = f" Si pregunta por la zona: trabajamos en {zona}." if zona else ""
     return Instruccion(
-        f"Lo que sabes del cliente: {datos_resumen}. Responde con brevedad a lo que acaba de decir; "
-        "si no lo sabes con seguridad, di que se lo concretará un comercial. Después vuelve a proponer "
-        "la visita gratuita o la llamada con un comercial.",
-        "Eso se lo concreta mejor un comercial, que lo verá con usted sin compromiso. "
-        "¿Le parece que le agendemos una visita gratuita?",
+        f'El cliente acaba de decir: "{texto_cliente}". Responde EXACTAMENTE a eso en UNA sola frase corta, '
+        "sin hacer ninguna pregunta y sin repetir lo que ya sabes de él; si es algo que no sabes con seguridad "
+        f"(compatibilidades, marcas, plazos, detalles técnicos), di que se lo confirma el comercial.{zona_txt} "
+        f"(Contexto, no lo repitas: {datos_resumen}.)",
+        "Eso se lo concreta mejor un comercial, que lo verá con usted sin compromiso.",
     )
 
 
@@ -135,6 +139,8 @@ _PATRON_PRECIO = re.compile(
     re.IGNORECASE,
 )
 _FRASE_SIN_PRECIO = "El precio exacto se lo concreta un comercial, porque depende de cada caso."
+_PATRON_COMPATIBLE = re.compile(r"\b(es|son|sería|serían|será|serán)\s+(totalmente\s+|100 % )?compatibles?\b", re.IGNORECASE)
+_FRASE_SIN_COMPATIBILIDAD = "Eso se lo confirma el comercial en la visita, según lo que ya tenga instalado."
 
 
 def contiene_precio(texto: str) -> bool:
@@ -152,6 +158,8 @@ def limpiar_frase(frase: str) -> str:
     f = re.sub(r"\s+", " ", f).strip()
     if contiene_precio(f):
         return _FRASE_SIN_PRECIO
+    if _PATRON_COMPATIBLE.search(f):
+        return _FRASE_SIN_COMPATIBILIDAD
     return f
 
 

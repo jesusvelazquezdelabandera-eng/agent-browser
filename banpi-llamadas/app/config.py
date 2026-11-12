@@ -86,6 +86,8 @@ class Settings:
     ollama_temperatura: float = 0.4
     ollama_timeout_s: float = 20.0
     ollama_keep_alive: str = "30m"
+    # Si el LLM no da su primera frase en este tiempo, Álex usa la frase de respaldo.
+    llm_timeout_primera_s: float = 2.5
 
     # Reconocimiento de voz (faster-whisper)
     whisper_model: str = "small"
@@ -171,6 +173,7 @@ def get_settings() -> Settings:
         ollama_temperatura=_float("OLLAMA_TEMPERATURA", 0.4),
         ollama_timeout_s=_float("OLLAMA_TIMEOUT_S", 20.0),
         ollama_keep_alive=_str("OLLAMA_KEEP_ALIVE", "30m"),
+        llm_timeout_primera_s=_float("LLM_TIMEOUT_PRIMERA_S", 2.5),
         whisper_model=_str("WHISPER_MODEL", "small"),
         whisper_device=_str("WHISPER_DEVICE", "auto"),
         whisper_compute_type=_str("WHISPER_COMPUTE_TYPE", "int8"),

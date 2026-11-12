@@ -38,6 +38,9 @@ class TestIntenciones:
             ("quítame, por favor", Intencion.NO_LLAMAR),
             ("¿De dónde habéis sacado mi número?", Intencion.ORIGEN_DATOS),
             ("¿Por qué tienen mi teléfono?", Intencion.ORIGEN_DATOS),
+            ("¿Y es compatible con Alexa?", Intencion.PREGUNTA_TECNICA),
+            ("¿Qué marcas usáis?", Intencion.PREGUNTA_TECNICA),
+            ("¿Cuánto tarda la instalación?", Intencion.PREGUNTA_TECNICA),
             ("quiero darme de baja", Intencion.NO_LLAMAR),
             ("estoy en la lista Robinson", Intencion.NO_LLAMAR),
             ("No gracias, no me interesa y no me llaméis más", Intencion.NO_LLAMAR),
@@ -257,6 +260,23 @@ class TestCasosReales:
         assert d.estado is Estado.CIERRE and "visita" in t3.respaldo
 
 
+class TestCierreControlado:
+    def test_pregunta_tecnica_no_la_responde_la_ia(self) -> None:
+        d = nuevo()
+        d.procesar("sí")
+        t = d.procesar("¿Es compatible con Google Home?")
+        assert t.instruccion is None and "comercial" in t.texto and "visita" in t.texto
+
+    def test_cierre_libre_una_frase_y_propuesta_fija(self) -> None:
+        d = nuevo()
+        d.procesar("sí")
+        d.procesar("un piso, las persianas")
+        d.procesar("comodidad")
+        t = d.procesar("¿Trabajáis en Dos Hermanas?")
+        assert t.max_frases == 1 and "visita gratuita" in t.texto_final
+        assert "Dos Hermanas" in (t.instruccion or "") and "?" not in t.respaldo
+
+
 class TestLimpiezaLLM:
     def test_recorta_a_dos_frases(self) -> None:
         texto = "Hola. Esto es una prueba. Y otra frase más. Y otra."
@@ -268,6 +288,11 @@ class TestLimpiezaLLM:
     def test_sustituye_precios(self) -> None:
         for frase in ["Cuesta 300 euros.", "Desde 99€ al mes.", "Tiene un descuento del 20%."]:
             assert not prompts.contiene_precio(prompts.limpiar_frase(frase))
+
+    def test_sustituye_compatibilidades(self) -> None:
+        for frase in ["Sí, es compatible con Alexa.", "No, no es compatible con Alexa.", "Son totalmente compatibles."]:
+            assert "comercial" in prompts.limpiar_frase(frase)
+        assert prompts.limpiar_frase("Compatible o no, se lo miramos.") == "Compatible o no, se lo miramos."
 
     def test_quita_emojis(self) -> None:
         assert prompts.limpiar_frase("Perfecto \U0001F600") == "Perfecto"
