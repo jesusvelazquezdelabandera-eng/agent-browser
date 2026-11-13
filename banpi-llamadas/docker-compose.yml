@@ -1,0 +1,34 @@
+# Servicios de apoyo: Asterisk (telefonía) y Ollama (modelo de lenguaje).
+# La aplicación Python se ejecuta fuera de Docker (ver README).
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    # Con GPU NVIDIA (requiere nvidia-container-toolkit), descomenta:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  asterisk:
+    build: ./asterisk
+    restart: unless-stopped
+    # Red del host: evita problemas de NAT con RTP y deja ARI en 127.0.0.1:8088.
+    network_mode: host
+    volumes:
+      - ./asterisk/conf/pjsip.conf:/etc/asterisk/pjsip.conf:ro
+      - ./asterisk/conf/http.conf:/etc/asterisk/http.conf:ro
+      - ./asterisk/conf/ari.conf:/etc/asterisk/ari.conf:ro
+      - ./asterisk/conf/rtp.conf:/etc/asterisk/rtp.conf:ro
+      - ./asterisk/conf/extensions.conf:/etc/asterisk/extensions.conf:ro
+      - ./data/grabaciones:/var/spool/asterisk/recording
+
+volumes:
+  ollama:

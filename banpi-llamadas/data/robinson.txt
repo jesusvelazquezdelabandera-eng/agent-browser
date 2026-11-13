@@ -1,0 +1,3 @@
+# Exportación local de la lista Robinson: un teléfono por línea.
+# Descárgala del servicio oficial de la Lista Robinson (ADigital) como entidad adherida
+# y sustituye este archivo antes de cada campaña. Se admiten comentarios con #.

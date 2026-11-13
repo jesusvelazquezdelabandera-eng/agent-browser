@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Banpi Llamadas</title>
+  <style>
+    :root { --fondo:#f6f7f9; --tarjeta:#fff; --texto:#1d2330; --suave:#667085; --borde:#e3e6eb; --acento:#0f6cbd; --ok:#1a7f37; --aviso:#9a6700; --mal:#b42318; }
+    @media (prefers-color-scheme: dark) { :root { --fondo:#121418; --tarjeta:#1b1e24; --texto:#e7e9ee; --suave:#9aa3b2; --borde:#2c313a; --acento:#5aa9ff; --ok:#4ac26b; --aviso:#d4a72c; --mal:#ff7b72; } }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--fondo); color:var(--texto); }
+    header { padding:16px 20px; border-bottom:1px solid var(--borde); background:var(--tarjeta); display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
+    header h1 { font-size:18px; margin:0; }
+    header span { color:var(--suave); }
+    main { max-width:1200px; margin:0 auto; padding:16px; display:grid; gap:16px; }
+    section { background:var(--tarjeta); border:1px solid var(--borde); border-radius:10px; padding:16px; overflow-x:auto; }
+    h2 { font-size:15px; margin:0 0 12px; }
+    .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+    .kpi { border:1px solid var(--borde); border-radius:8px; padding:10px 12px; }
+    .kpi b { display:block; font-size:22px; }
+    .kpi small { color:var(--suave); }
+    table { border-collapse:collapse; width:100%; font-size:14px; }
+    th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--borde); vertical-align:top; }
+    th { color:var(--suave); font-weight:600; }
+    form.linea { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    input[type=text], input[type=file] { padding:6px 8px; border:1px solid var(--borde); border-radius:6px; background:var(--fondo); color:var(--texto); }
+    button { padding:6px 12px; border:1px solid var(--acento); background:var(--acento); color:#fff; border-radius:6px; cursor:pointer; }
+    button.sec { background:transparent; color:var(--acento); }
+    .msg { padding:10px 12px; border-radius:8px; border:1px solid var(--ok); color:var(--ok); }
+    .error { border-color:var(--aviso); color:var(--aviso); }
+    .etq { display:inline-block; padding:1px 8px; border-radius:99px; border:1px solid var(--borde); font-size:12px; }
+    .etq.cita { color:var(--ok); border-color:var(--ok); }
+    .etq.no_llamar, .etq.excluido { color:var(--mal); border-color:var(--mal); }
+    .etq.cola_humana, .etq.reintentar { color:var(--aviso); border-color:var(--aviso); }
+    .agente { color:var(--acento); }
+    .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; }
+    code { font-size:13px; }
+    a { color:var(--acento); }
+    .suave { color:var(--suave); }
+  </style>
+</head>
+<body>
+<header>
+  <h1>{{ s.nombre_empresa }}: agente de llamadas</h1>
+  <span>{{ s.nombre_agente }} · {{ s.ollama_model if s.llm_backend == "ollama" else "sin LLM (plantillas)" }} · Whisper {{ s.whisper_model }}</span>
+  <a href="/" style="margin-left:auto">Actualizar</a>
+</header>
+<main>
+  {% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
+  {% if error_worker %}<div class="msg error">{{ error_worker }}</div>{% endif %}
+
+  <section>
+    <div class="kpis">
+      <div class="kpi"><b>{{ stats.contactos }}</b><small>contactos</small></div>
+      <div class="kpi"><b>{{ stats.llamadas }}</b><small>intentos de llamada</small></div>
+      <div class="kpi"><b>{{ stats.citas }}</b><small>citas agendadas</small></div>
+      <div class="kpi"><b>{{ stats.por_estado.get("cola_humana", 0) }}</b><small>en cola para comercial</small></div>
+      <div class="kpi"><b>{{ stats.por_estado.get("no_llamar", 0) }}</b><small>no contactar</small></div>
+      <div class="kpi"><b>{{ stats.latencia_media_ms ~ " ms" if stats.latencia_media_ms else "-" }}</b><small>latencia media</small></div>
+    </div>
+  </section>
+
+  <div class="grid2">
+    <section>
+      <h2>1. Cargar contactos (CSV)</h2>
+      <form class="linea" method="post" action="/contactos/importar" enctype="multipart/form-data">
+        <input type="file" name="archivo" accept=".csv,text/csv" required>
+        <button>Importar</button>
+      </form>
+      <p class="suave">Columnas: <code>nombre, telefono, email, consentimiento, consentimiento_fecha, consentimiento_origen, base_legal</code>.
+        Solo se llama a quien tenga <code>consentimiento</code> = sí. Con <code>base_legal</code> = <code>interes_legitimo</code> y sin consentimiento, el contacto pasa a la cola de comerciales humanos.</p>
+    </section>
+    <section>
+      <h2>2. Crear campaña</h2>
+      <form class="linea" method="post" action="/campanas">
+        <input type="text" name="nombre" placeholder="Nombre de la campaña" required>
+        <button>Crear</button>
+      </form>
+      <p class="suave">Incluye todos los contactos no marcados como "no contactar". Antes de cada llamada se comprueban consentimiento, lista Robinson, lista interna, horario (L a V, 9:00 a 21:00, sin festivos) y el máximo de {{ s.max_intentos }} intentos en {{ s.ventana_intentos_dias }} días.</p>
+    </section>
+  </div>
+
+  <section>
+    <h2>3. Campañas</h2>
+    {% if campanas %}
+    <table>
+      <tr><th>Campaña</th><th>Estado</th><th>Contactos</th><th></th></tr>
+      {% for c, cuenta in campanas %}
+      <tr>
+        <td>{{ c.nombre }}<br><small class="suave">{{ c.creada|local }}</small></td>
+        <td><span class="etq">{{ c.estado }}</span></td>
+        <td>{% for estado, n in cuenta.items() %}<span class="etq {{ estado }}">{{ estado }}: {{ n }}</span> {% endfor %}</td>
+        <td>
+          {% if c.estado != "activa" and c.estado != "terminada" %}
+          <form method="post" action="/campanas/{{ c.id }}/iniciar"><button>Lanzar</button></form>
+          {% elif c.estado == "activa" %}
+          <form method="post" action="/campanas/{{ c.id }}/pausar"><button class="sec">Pausar</button></form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="suave">Todavía no hay campañas.</p>{% endif %}
+  </section>
+
+  {% if detalle %}
+  <section>
+    <h2>Llamada #{{ detalle.id }} · {{ detalle.contacto.nombre }} {{ detalle.contacto.telefono }} · <span class="etq {{ detalle.resultado }}">{{ detalle.resultado }}</span></h2>
+    <p class="suave">{{ detalle.inicio|local }} · grabación: {{ detalle.grabacion_ruta if detalle.grabacion_permitida and detalle.grabacion_ruta else "no" }}
+      {% if detalle.latencia_media_ms %} · latencia media {{ detalle.latencia_media_ms }} ms{% endif %}
+      {% if detalle.rellamar_texto %} · volver a llamar: {{ detalle.rellamar_texto }}{% endif %}</p>
+    <table>
+      {% for t in detalle.transcripciones %}
+      <tr><td class="{{ 'agente' if t.rol == 'agente' else '' }}" style="width:90px">{{ s.nombre_agente if t.rol == "agente" else "Cliente" }}</td>
+        <td>{{ t.texto }}</td><td class="suave" style="width:140px">{{ t.estado }}{% if t.latencia_ms %} · {{ t.latencia_ms }} ms{% endif %}</td></tr>
+      {% else %}<tr><td class="suave">Sin transcripción (no se llegó a hablar).</td></tr>{% endfor %}
+    </table>
+  </section>
+  {% endif %}
+
+  <div class="grid2">
+    <section>
+      <h2>Citas <a href="/exportar/citas.csv" style="font-weight:normal;font-size:13px">exportar CSV</a></h2>
+      <table>
+        <tr><th>Cliente</th><th>Tipo</th><th>Cuándo</th></tr>
+        {% for c in citas %}
+        <tr><td>{{ c.contacto.nombre }}<br><small class="suave">{{ c.contacto.telefono }}</small></td><td>{{ c.tipo }}</td>
+          <td>{{ c.cuando_texto }}<br><small class="suave">{{ c.resumen }}</small></td></tr>
+        {% else %}<tr><td class="suave" colspan="3">Sin citas todavía.</td></tr>{% endfor %}
+      </table>
+    </section>
+    <section>
+      <h2>Cola para comerciales humanos <a href="/exportar/cola_humana.csv" style="font-weight:normal;font-size:13px">exportar CSV</a></h2>
+      <p class="suave">Contactos con interés legítimo pero sin consentimiento: la IA no puede llamarles (art. 66.1.a Ley 11/2022).</p>
+      <table>
+        {% for c in cola_humana %}<tr><td>{{ c.nombre }}</td><td>{{ c.telefono }}</td></tr>
+        {% else %}<tr><td class="suave">Vacía.</td></tr>{% endfor %}
+      </table>
+    </section>
+  </div>
+
+  <section>
+    <h2>Últimas llamadas</h2>
+    <table>
+      <tr><th>#</th><th>Inicio</th><th>Contacto</th><th>Resultado</th><th>Latencia</th><th></th></tr>
+      {% for l in llamadas %}
+      <tr><td>{{ l.id }}</td><td>{{ l.inicio|local }}</td><td>{{ l.contacto.nombre }} {{ l.contacto.telefono }}</td>
+        <td><span class="etq {{ l.resultado }}">{{ l.resultado }}</span>{% if l.error %}<br><small class="suave">{{ l.error }}</small>{% endif %}</td>
+        <td>{{ l.latencia_media_ms ~ " ms" if l.latencia_media_ms else "" }}</td>
+        <td><a href="/?llamada={{ l.id }}">ver</a></td></tr>
+      {% else %}<tr><td class="suave" colspan="6">Sin llamadas todavía.</td></tr>{% endfor %}
+    </table>
+  </section>
+
+  <section>
+    <h2>Contactos <a href="/exportar/auditoria.csv" style="font-weight:normal;font-size:13px">exportar auditoría</a></h2>
+    <table>
+      <tr><th>Nombre</th><th>Teléfono</th><th>Consentimiento</th><th>Estado</th><th></th></tr>
+      {% for c in contactos %}
+      <tr><td>{{ c.nombre }}</td><td>{{ c.telefono }}</td>
+        <td>{{ "sí" if c.consentimiento else "no" }}{% if c.base_legal %} <small class="suave">({{ c.base_legal }})</small>{% endif %}
+          {% if c.consentimiento_origen %}<br><small class="suave">{{ c.consentimiento_origen }} {{ c.consentimiento_fecha|local }}</small>{% endif %}</td>
+        <td><span class="etq {{ c.estado }}">{{ c.estado }}</span></td>
+        <td>{% if not c.no_llamar %}<form method="post" action="/contactos/{{ c.id }}/no-llamar"><button class="sec">No llamar</button></form>{% endif %}</td></tr>
+      {% else %}<tr><td class="suave" colspan="5">Sin contactos. Importa un CSV.</td></tr>{% endfor %}
+    </table>
+  </section>
+</main>
+</body>
+</html>
